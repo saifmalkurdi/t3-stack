@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+body {
+  background: linear-gradient(135deg, #eff6ff 0%, #f9fafb 50%, #eef2ff 100%);
+  background-attachment: fixed;
+  color: #111827;
+}
+
+.dark body {
+  background: linear-gradient(135deg, #030712 0%, #111827 50%, #1e1b4b 100%);
+  background-attachment: fixed;
+  color: #f3f4f6;
 }

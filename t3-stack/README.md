@@ -1,29 +1,103 @@
-# Create T3 App
+# T3 Press
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+A full-stack publishing platform built with the [T3 Stack](https://create.t3.gg/).
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- **Two roles** — Publishers create & manage posts; Readers browse, like, and bookmark
+- **Authentication** — Email/password + Google OAuth (NextAuth.js v5)
+- **Posts** — Create, edit, delete, publish/draft, cover photo (URL or file upload)
+- **Feed** — Infinite scroll, full-text search, like & bookmark any post
+- **Bookmarks** — Personal saved posts list with infinite scroll
+- **Profile** — Upload profile photo, edit display name, change password
+- **Analytics** — Daily likes & publishing frequency charts (Recharts), per-post performance
+- **Notifications** — Real-time bell badge for publishers when someone likes a post
+- **Dark mode** — System-preference aware, persisted to localStorage, no FOUC
+- **Fully responsive** — Mobile-first with hamburger drawer navigation
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Tech Stack
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| Auth | NextAuth.js v5 beta |
+| API | tRPC v11 + React Query v5 |
+| ORM | Prisma 6 |
+| Database | Neon PostgreSQL (serverless) |
+| Styling | Tailwind CSS v4 |
+| Charts | Recharts |
 
-## Learn More
+## Getting Started
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+### 1. Clone & install
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+```bash
+git clone <repo-url>
+cd t3-stack
+npm install
+```
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+### 2. Set up environment variables
 
-## How do I deploy this?
+```bash
+cp .env.example .env
+```
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+Fill in `.env`:
+
+```env
+# Generate with: npx auth secret
+AUTH_SECRET=""
+
+# From Google Cloud Console → OAuth 2.0 credentials
+AUTH_GOOGLE_ID=""
+AUTH_GOOGLE_SECRET=""
+
+# From Neon dashboard
+DATABASE_URL=""   # Pooled connection (pgbouncer)
+DIRECT_URL=""     # Direct connection (for migrations)
+```
+
+### 3. Run database migrations
+
+```bash
+npx prisma migrate deploy
+```
+
+### 4. Start the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Project Structure
+
+```
+src/
+├── app/                  # Next.js App Router pages
+│   ├── auth/             # signin, signup, choose-role
+│   ├── feed/             # Reader feed with search
+│   ├── bookmarks/        # Saved posts
+│   ├── profile/          # Profile settings
+│   └── publisher/
+│       ├── dashboard/    # Post management + post-form-modal
+│       └── analytics/    # Charts & stats
+├── components/
+│   ├── navbar.tsx        # Responsive navbar with notification bell
+│   ├── theme-provider.tsx
+│   └── ui/               # shadcn/ui components
+└── server/
+    ├── auth/             # NextAuth config
+    ├── db.ts             # Prisma client
+    └── api/
+        └── routers/      # post, like, bookmark, auth, analytics, notification
+```
+
+## Deployment
+
+Deploy to [Vercel](https://vercel.com) in one click — set the environment variables in the Vercel dashboard and it will pick up Prisma automatically.
+
+For the database, a [Neon](https://neon.tech) free tier is sufficient for development and small production workloads.

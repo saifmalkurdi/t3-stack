@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { LayoutDashboard, Newspaper, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import {
@@ -15,11 +16,13 @@ import {
 
 export default function ChooseRolePage() {
   const [selected, setSelected] = useState<"PUBLISHER" | "USER" | null>(null);
+  const { update } = useSession();
 
   const setRole = api.auth.setRole.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success("Welcome!");
-      // Full page reload — server pages read from DB so routing will be correct
+      // Refresh the JWT so the new role is reflected in the session token
+      await update();
       window.location.href =
         data.role === "PUBLISHER" ? "/publisher/dashboard" : "/feed";
     },

@@ -206,7 +206,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "c:\\Users\\saifa\\Desktop\\t3-stack\\t3-stack\\generated\\prisma",
+      "value": "C:\\Users\\saifa\\Desktop\\t3-stack\\t3-stack\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -220,7 +220,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "c:\\Users\\saifa\\Desktop\\t3-stack\\t3-stack\\prisma\\schema.prisma",
+    "sourceFilePath": "C:\\Users\\saifa\\Desktop\\t3-stack\\t3-stack\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -234,6 +234,7 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {

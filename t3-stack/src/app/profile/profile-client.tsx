@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { signOut } from "next-auth/react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -14,7 +15,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { Loader2, User, Mail, Lock, Shield, Camera } from "lucide-react";
+import { Loader2, User, Mail, Lock, Shield, Camera, Trash2 } from "lucide-react";
 
 function GoogleIcon() {
   return (
@@ -89,6 +90,17 @@ export function ProfileClient() {
     };
     reader.readAsDataURL(file);
   };
+
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
+
+  const deleteAccount = api.auth.deleteAccount.useMutation({
+    onSuccess: async () => {
+      toast.success("Account deleted");
+      await signOut({ callbackUrl: "/auth/signin" });
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const changePassword = api.auth.changePassword.useMutation({
     onSuccess: () => {
@@ -362,6 +374,64 @@ export function ProfileClient() {
               {profile.hasPassword ? "Update password" : "Set password"}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Danger zone */}
+      <Card className="mt-6 border-red-200 dark:border-red-900/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base text-red-600 dark:text-red-400">
+            <Trash2 className="h-4 w-4" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Permanently delete your account and all associated data.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!showDeleteForm ? (
+            <Button
+              variant="outline"
+              className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+              onClick={() => setShowDeleteForm(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete my account
+            </Button>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Type <span className="font-mono font-semibold text-red-600">delete my account</span> to confirm.
+              </p>
+              <Input
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="delete my account"
+                className="border-red-300 focus-visible:ring-red-400 dark:border-red-800"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setShowDeleteForm(false); setDeleteConfirm(""); }}
+                  disabled={deleteAccount.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+                  disabled={deleteConfirm !== "delete my account" || deleteAccount.isPending}
+                  onClick={() => deleteAccount.mutate()}
+                >
+                  {deleteAccount.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Permanently delete
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -136,4 +136,19 @@ export const authRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+
+  deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    await ctx.db.$transaction(async (tx) => {
+      // Remove other users' likes & bookmarks on this user's posts
+      // (must happen before posts are deleted since Post has no cascade to these)
+      await tx.like.deleteMany({ where: { post: { createdById: userId } } });
+      await tx.bookmark.deleteMany({ where: { post: { createdById: userId } } });
+      // Delete all posts owned by this user
+      await tx.post.deleteMany({ where: { createdById: userId } });
+      // Delete the user — cascades: own likes, own bookmarks, notifications, accounts, sessions
+      await tx.user.delete({ where: { id: userId } });
+    });
+    return { success: true };
+  }),
 });

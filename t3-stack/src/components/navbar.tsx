@@ -194,7 +194,6 @@ export function Navbar() {
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
   const { theme, toggle } = useTheme();
-  const isPublisher = session?.user?.role === "PUBLISHER";
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -204,6 +203,8 @@ export function Navbar() {
   });
   const avatarUrl = profile?.image ?? session?.user?.image;
   const displayName = profile?.name ?? session?.user?.name;
+  // Use DB profile role first (always fresh), fall back to JWT session role
+  const isPublisher = (profile?.role ?? session?.user?.role) === "PUBLISHER";
 
   const utils = api.useUtils();
   const { data: unreadData } = api.notification.getUnreadCount.useQuery(undefined, {

@@ -21,8 +21,8 @@ export default function ChooseRolePage() {
   const setRole = api.auth.setRole.useMutation({
     onSuccess: async (data) => {
       toast.success("Welcome!");
-      // Refresh the JWT so the new role is reflected in the session token
-      await update();
+      // Refresh the JWT with the new role so the session token is updated immediately
+      await update({ role: data.role, onboarded: true });
       window.location.href =
         data.role === "PUBLISHER" ? "/publisher/dashboard" : "/feed";
     },

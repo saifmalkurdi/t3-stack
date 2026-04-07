@@ -1,5 +1,8 @@
-import { auth } from "~/server/auth";
+import NextAuth from "next-auth";
+import { authConfigEdge } from "~/server/auth/config.edge";
 import { NextResponse } from "next/server";
+
+const { auth } = NextAuth(authConfigEdge);
 
 // Routes that require authentication
 const protectedPrefixes = ["/feed", "/bookmarks", "/profile", "/publisher"];

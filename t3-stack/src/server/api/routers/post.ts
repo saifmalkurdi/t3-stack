@@ -49,6 +49,16 @@ export const postRouter = createTRPCRouter({
       return { items, nextCursor };
     }),
 
+  // PUBLIC: returns the id of the most recent published post (used for new-post polling)
+  getLatestPostId: publicProcedure.query(async ({ ctx }) => {
+    const post = await ctx.db.post.findFirst({
+      where: { published: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    return { latestId: post?.id ?? null };
+  }),
+
   // PUBLISHER: get own posts
   getMyPosts: publisherProcedure.query(async ({ ctx }) => {
     return ctx.db.post.findMany({
@@ -106,7 +116,7 @@ export const postRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const post = await ctx.db.post.findUnique({ where: { id: input.id } });
-      if (!post || post.createdById !== ctx.session.user.id) {
+      if (!post || post?.createdById !== ctx.session.user.id) {
         throw new Error("Not found or forbidden");
       }
       return ctx.db.post.update({
@@ -127,7 +137,7 @@ export const postRouter = createTRPCRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const post = await ctx.db.post.findUnique({ where: { id: input.id } });
-      if (!post || post.createdById !== ctx.session.user.id) {
+      if (!post || post?.createdById !== ctx.session.user.id) {
         throw new Error("Not found or forbidden");
       }
       return ctx.db.post.delete({ where: { id: input.id } });

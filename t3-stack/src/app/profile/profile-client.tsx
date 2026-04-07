@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -43,7 +42,6 @@ function GoogleIcon() {
 export function ProfileClient() {
   const { data: profile, isLoading } = api.auth.getProfile.useQuery();
   const utils = api.useUtils();
-  const { update: updateSession } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -60,7 +58,7 @@ export function ProfileClient() {
   const updateProfile = api.auth.updateProfile.useMutation({
     onSuccess: async () => {
       toast.success("Name updated!");
-      await updateSession({ name });
+      await utils.auth.getProfile.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });

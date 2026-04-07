@@ -51,7 +51,7 @@ export default function SignInPage() {
     <div className="flex min-h-[calc(100vh-57px)] items-center justify-center px-4 py-12">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Sign in</CardTitle>
+          <CardTitle className="text-2xl">Login</CardTitle>
           <CardDescription>Enter your credentials to continue</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -82,7 +82,7 @@ export default function SignInPage() {
           <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Sign in
+              Login
             </Button>
 
             <div className="flex w-full items-center gap-2">

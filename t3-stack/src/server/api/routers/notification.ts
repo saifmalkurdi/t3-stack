@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const notificationRouter = createTRPCRouter({
@@ -23,6 +24,24 @@ export const notificationRouter = createTRPCRouter({
     await ctx.db.notification.updateMany({
       where: { userId: ctx.session.user.id, read: false },
       data: { read: true },
+    });
+    return { success: true };
+  }),
+
+  // Delete a single notification
+  deleteOne: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.notification.deleteMany({
+        where: { id: input.id, userId: ctx.session.user.id },
+      });
+      return { success: true };
+    }),
+
+  // Delete all notifications for the current user
+  deleteAll: protectedProcedure.mutation(async ({ ctx }) => {
+    await ctx.db.notification.deleteMany({
+      where: { userId: ctx.session.user.id },
     });
     return { success: true };
   }),

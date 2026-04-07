@@ -88,7 +88,7 @@ export function AnalyticsClient() {
   const { data: publishStats, isLoading: publishLoading } =
     api.analytics.getPublishingStats.useQuery();
   const { data: myPosts, isLoading: postsLoading } =
-    api.post.getMyPosts.useQuery();
+    api.post.getMyPosts.useQuery(undefined, { refetchInterval: 15_000 });
 
   if (likesLoading || publishLoading || postsLoading) {
     return (

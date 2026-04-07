@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { api } from "~/trpc/react";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { api, type RouterOutputs } from "~/trpc/react";
 import { toast } from "sonner";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Search, Heart, Bookmark, Loader2 } from "lucide-react";
+import { Search, Heart, Bookmark, Loader2, RefreshCw } from "lucide-react";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -32,26 +33,109 @@ function PostCard({
   };
 }) {
   const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const { data: likeStatus } = api.like.getStatus.useQuery({ postId: post.id });
   const { data: bookmarkStatus } = api.bookmark.getStatus.useQuery({
     postId: post.id,
   });
 
+  const [localCount, setLocalCount] = useState(post._count.likes);
+  const likePendingRef = useRef(false);
+
+  useEffect(() => {
+    if (!likePendingRef.current) setLocalCount(post._count.likes);
+  }, [post._count.likes]);
+
   const toggleLike = api.like.toggle.useMutation({
-    onSuccess: () => {
-      void utils.like.getStatus.invalidate({ postId: post.id });
-      void utils.post.getFeed.invalidate();
+    onMutate: async ({ postId }) => {
+      likePendingRef.current = true;
+      // Cancel ALL in-flight feed requests so they don't overwrite the optimistic update
+      await utils.post.getFeed.cancel();
+      await utils.like.getStatus.cancel({ postId });
+      await utils.post.getMyPosts.cancel();
+      const prev = utils.like.getStatus.getData({ postId });
+      const delta = prev?.liked ? -1 : 1;
+      utils.like.getStatus.setData({ postId }, { liked: !prev?.liked });
+      // Optimistically update feed cache so post._count.likes moves instantly
+      queryClient.setQueriesData<InfiniteData<RouterOutputs["post"]["getFeed"]>>(
+        { queryKey: [["post", "getFeed"]] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.id === postId
+                  ? { ...item, _count: { ...item._count, likes: item._count.likes + delta } }
+                  : item,
+              ),
+            })),
+          };
+        },
+      );
+      // Optimistically update publisher dashboard cache
+      const prevMyPosts = utils.post.getMyPosts.getData();
+      utils.post.getMyPosts.setData(undefined, (old) => {
+        if (!old) return old;
+        return old.map((p) =>
+          p.id === postId
+            ? { ...p, _count: { ...p._count, likes: p._count.likes + delta } }
+            : p,
+        );
+      });
+      setLocalCount((c) => c + delta);
+      return { prev, delta, prevMyPosts };
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err, { postId }, ctx) => {
+      utils.like.getStatus.setData({ postId }, ctx?.prev);
+      // Revert the feed cache optimistic update
+      queryClient.setQueriesData<InfiniteData<RouterOutputs["post"]["getFeed"]>>(
+        { queryKey: [["post", "getFeed"]] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.id === postId
+                  ? { ...item, _count: { ...item._count, likes: item._count.likes - (ctx?.delta ?? 0) } }
+                  : item,
+              ),
+            })),
+          };
+        },
+      );
+      // Revert publisher dashboard cache
+      utils.post.getMyPosts.setData(undefined, ctx?.prevMyPosts);
+      setLocalCount((c) => c - (ctx?.delta ?? 0));
+      toast.error(err.message);
+    },
+    onSettled: (_, __, { postId }) => {
+      likePendingRef.current = false;
+      void utils.like.getStatus.invalidate({ postId });
+      void utils.post.getFeed.invalidate();
+      void utils.post.getMyPosts.invalidate();
+    },
   });
 
   const toggleBookmark = api.bookmark.toggle.useMutation({
-    onSuccess: (data) => {
-      void utils.bookmark.getStatus.invalidate({ postId: post.id });
-      void utils.bookmark.getMyBookmarks.invalidate();
-      toast.success(data.bookmarked ? "Bookmarked" : "Bookmark removed");
+    onMutate: async ({ postId }) => {
+      await utils.bookmark.getStatus.cancel({ postId });
+      const prev = utils.bookmark.getStatus.getData({ postId });
+      utils.bookmark.getStatus.setData({ postId }, { bookmarked: !prev?.bookmarked });
+      return { prev };
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err, { postId }, ctx) => {
+      utils.bookmark.getStatus.setData({ postId }, ctx?.prev);
+      toast.error(err.message);
+    },
+    onSettled: (data, _, { postId }) => {
+      void utils.bookmark.getStatus.invalidate({ postId });
+      void utils.bookmark.getMyBookmarks.invalidate();
+      if (data) toast.success(data.bookmarked ? "Bookmarked" : "Bookmark removed");
+    },
   });
 
   const liked = likeStatus?.liked ?? false;
@@ -118,7 +202,7 @@ function PostCard({
           disabled={toggleLike.isPending}
         >
           <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
-          <span>{post._count.likes}</span>
+          <span>{localCount}</span>
         </Button>
 
         <Button
@@ -140,6 +224,11 @@ export function FeedClient() {
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 400);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  // Track the post id that was at the top when feed last loaded
+  const seenLatestIdRef = useRef<number | null>(null);
+  const [hasNewPosts, setHasNewPosts] = useState(false);
+
+  const utils = api.useUtils();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     api.post.getFeed.useInfiniteQuery(
@@ -149,6 +238,39 @@ export function FeedClient() {
         refetchOnWindowFocus: false,
       },
     );
+
+  // Seed the baseline id once the feed first loads
+  useEffect(() => {
+    const firstId = data?.pages[0]?.items[0]?.id;
+    if (firstId !== undefined && seenLatestIdRef.current === null) {
+      seenLatestIdRef.current = firstId;
+    }
+  }, [data]);
+
+  // Poll for new posts every 30 seconds
+  const { data: latestPostData } = api.post.getLatestPostId.useQuery(undefined, {
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    const latestId = latestPostData?.latestId ?? null;
+    if (
+      latestId !== null &&
+      seenLatestIdRef.current !== null &&
+      latestId > seenLatestIdRef.current
+    ) {
+      setHasNewPosts(true);
+    }
+  }, [latestPostData]);
+
+  const handleReload = async () => {
+    setHasNewPosts(false);
+    await utils.post.getFeed.invalidate();
+    // After refetch the topmost id becomes the new baseline
+    seenLatestIdRef.current = null;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Infinite scroll with IntersectionObserver
   const handleObserver = useCallback(
@@ -175,6 +297,19 @@ export function FeedClient() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
+      {/* New-posts banner */}
+      {hasNewPosts && (
+        <div className="sticky top-16 z-10 mb-4">
+          <button
+            onClick={() => void handleReload()}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white shadow-md transition hover:bg-blue-700 active:scale-95"
+          >
+            <RefreshCw className="h-4 w-4" />
+            New posts available — click to reload
+          </button>
+        </div>
+      )}
+
       {/* Search */}
       <div className="mb-6">
         <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">

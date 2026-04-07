@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "~/trpc/react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -23,22 +23,44 @@ function BookmarkedPostCard({
   const utils = api.useUtils();
   const { data: likeStatus } = api.like.getStatus.useQuery({ postId: post.id });
 
+  const [localCount, setLocalCount] = useState(post._count.likes);
+
+  useEffect(() => {
+    setLocalCount(post._count.likes);
+  }, [post._count.likes]);
+
   const toggleLike = api.like.toggle.useMutation({
-    onSuccess: () => {
-      void utils.like.getStatus.invalidate({ postId: post.id });
+    onMutate: async ({ postId }) => {
+      await utils.like.getStatus.cancel({ postId });
+      const prev = utils.like.getStatus.getData({ postId });
+      utils.like.getStatus.setData({ postId }, { liked: !prev?.liked });
+      setLocalCount((c) => (prev?.liked ? c - 1 : c + 1));
+      return { prev };
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err, { postId }, ctx) => {
+      utils.like.getStatus.setData({ postId }, ctx?.prev);
+      setLocalCount(post._count.likes);
+      toast.error(err.message);
+    },
+    onSettled: (_, __, { postId }) => {
+      void utils.like.getStatus.invalidate({ postId });
+    },
   });
 
   const toggleBookmark = api.bookmark.toggle.useMutation({
-    onSuccess: () => {
-      void utils.bookmark.getMyBookmarks.invalidate();
-      toast.success("Bookmark removed");
+    onMutate: async ({ postId }) => {
+      await utils.bookmark.getMyBookmarks.cancel({ limit: 10 });
+      const prev = utils.bookmark.getMyBookmarks.getData({ limit: 10 });
+      return { prev };
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) utils.bookmark.getMyBookmarks.setData({ limit: 10 }, ctx.prev);
+      toast.error(err.message);
+    },
+    onSettled: () => {
+      void utils.bookmark.getMyBookmarks.invalidate();
+    },
   });
-
-  const liked = likeStatus?.liked ?? false;
 
   return (
     <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
@@ -96,12 +118,14 @@ function BookmarkedPostCard({
         <Button
           variant="ghost"
           size="sm"
-          className={`gap-1.5 ${liked ? "text-red-500 hover:text-red-600" : "text-gray-500 hover:text-gray-700"}`}
+          className={`gap-1.5 ${(likeStatus?.liked ?? false) ? "text-red-500 hover:text-red-600" : "text-gray-500 hover:text-gray-700"}`}
           onClick={() => toggleLike.mutate({ postId: post.id })}
           disabled={toggleLike.isPending}
         >
-          <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
-          <span>{post._count.likes}</span>
+          <Heart
+            className={`h-4 w-4 ${(likeStatus?.liked ?? false) ? "fill-current" : ""}`}
+          />
+          <span>{localCount}</span>
         </Button>
 
         <Button

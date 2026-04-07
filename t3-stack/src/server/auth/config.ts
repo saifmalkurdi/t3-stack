@@ -89,10 +89,9 @@ export const authConfig = {
       }
       // Google OAuth: upsert user in DB and store DB id + role in token
       if (account?.provider === "google" && profile?.email) {
-        const email = profile.email as string;
+        const email = profile.email;
         let dbUser = await db.user.findUnique({ where: { email } });
-        if (!dbUser) {
-          dbUser = await db.user.create({
+        dbUser ??= await db.user.create({
             data: {
               name: (profile.name as string | undefined) ?? email,
               email,
@@ -100,7 +99,6 @@ export const authConfig = {
               onboarded: false,
             },
           });
-        }
         token.id = dbUser.id;
         token.role = dbUser.role;
         token.onboarded = dbUser.onboarded;
@@ -118,8 +116,8 @@ export const authConfig = {
         user: {
           ...session.user,
           id: token.id as string,
-          name: token.name as string | null | undefined,
-          image: token.picture as string | null | undefined,
+          name: token.name,
+          image: token.picture,
           role: token.role as "PUBLISHER" | "USER",
           onboarded: token.onboarded as boolean,
         },

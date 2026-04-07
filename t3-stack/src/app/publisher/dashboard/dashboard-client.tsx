@@ -19,7 +19,9 @@ export function PublisherDashboardClient() {
     published: boolean;
   } | null>(null);
 
-  const { data: posts, isLoading, refetch } = api.post.getMyPosts.useQuery();
+  const { data: posts, isLoading, refetch } = api.post.getMyPosts.useQuery(undefined, {
+    refetchInterval: 15_000,
+  });
 
   const deletePost = api.post.delete.useMutation({
     onSuccess: () => {
@@ -133,7 +135,9 @@ export function PublisherDashboardClient() {
                       disabled={deletePost.isPending}
                       className="text-red-500 hover:text-red-600"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletePost.isPending
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Trash2 className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
